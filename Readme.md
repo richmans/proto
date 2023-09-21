@@ -1,2 +1,2 @@
 # Proto
-Golang solutions for [ProtoHackers](protohackers.com)
+Golang solutions for [ProtoHackers](https://protohackers.com)
