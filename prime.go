@@ -4,7 +4,21 @@ import (
 "net"
 "os"
 "fmt"
+"bufio"
+"encoding/json"
+"math/big"
+"math"
 )
+
+type PrimeRequest struct {
+	Method string
+	Number *float64
+}
+
+type PrimeResponse struct {
+	Method string `json:"method"`
+	Prime bool `json:"prime"`
+}
 
 type PrimeServer struct {
 	port uint16
@@ -34,16 +48,53 @@ func (s *PrimeServer) Run() {
 		}
 }
 
-func (s *PrimeServer) processClient(connection net.Conn) {
-	buffer := make([]byte, 1024)
-	for {
-	  mLen, err := connection.Read(buffer)
-	  if err != nil {
-	    fmt.Println("Error reading:", err.Error())
+func (s *PrimeServer) processClient(con net.Conn) {
+	var err error
+	scanner := bufio.NewScanner(con)
+	for scanner.Scan() {
+	  data := scanner.Bytes()
+	  fmt.Printf("Received %d bytes\n", len(data))
+    err = s.processRequest(data, con)
+		if err != nil {
 			break
-	  }
-	  fmt.Printf("Received %d bytes\n", mLen)
-	  _, err = connection.Write([]byte(buffer[:mLen]))
+		}
 	}
-  connection.Close()
+	if scanner.Err() != nil {
+    err = scanner.Err()
+ 	}
+	if err != nil {	con.Write([]byte("malformed"))		
+		fmt.Println(err)
+	}
+	fmt.Println("close")
+  con.Close()
+}
+func (s *PrimeServer) processRequest(data []byte, con net.Conn) error {
+	var q PrimeRequest
+	var r PrimeResponse
+	err := json.Unmarshal(data, &q)
+	fmt.Println(string(data))
+	if err != nil {
+		return err
+	}
+	if q.Method != "isPrime" {
+		return fmt.Errorf("wrong method: %s", q.Method)
+	}
+	if q.Number == nil {
+		return fmt.Errorf("no number")
+	}
+	r.Method = q.Method
+	r.Prime = isPrime(*q.Number)
+	result, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(result))
+	_, err = con.Write(result)
+	_, err = con.Write([]byte("\n"))
+	return err
+}
+
+func isPrime(number float64) bool {
+	if math.Mod(number, 1.0) != 0 {return false}
+	return big.NewInt(int64(number)).ProbablyPrime(0)
 }
