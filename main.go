@@ -12,7 +12,7 @@ type Server interface {
 	
 func main() {
 	var challenge int
-	flag.IntVar(&challenge, "challenge",3, "Challenge number")
+	flag.IntVar(&challenge, "challenge",4, "Challenge number")
 	flag.Parse()
 	
 	var port uint16 
@@ -27,6 +27,8 @@ func main() {
 	  	server = NewMeansServer(port);
 		case 3:
 	  	server = NewChatServer(port);
+		case 4:
+	  	server = NewDatabaseServer(port);
 		default:
 			fmt.Printf("Unknown challenge\n")
 			os.Exit(1)
