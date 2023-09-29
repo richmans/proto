@@ -167,24 +167,26 @@ type Car struct {
 
 func (c *Car) hasTicket(one uint32, two uint32) bool {
   
-  for i := one ; i <= two; i += 86400 {
-    day := uint32(i / 86400)
-    _, ok := c.ticketDays[day]
+  start := uint32(float64(one) / 86400)
+  stop := uint32(float64(two) / 86400)
+  for i := start; i <= stop; i+=1  {
+    _, ok := c.ticketDays[i]
     if ok { 
-      fmt.Printf("ticket on %d for %s\n", day, c.plate)
+      fmt.Printf("ticket on %d for %s\n", i, c.plate)
       return true
     }
-    fmt.Printf("no ticket on %d for %s\n", day, c.plate)
+    fmt.Printf("no ticket on %d for %s\n", i, c.plate)
   }
   
   return false
 }
 
 func (c *Car) markTicket(one uint32, two uint32) {
-  for i := one ; i <= two; i += 86400 {
-    day := uint32(i / 86400)
-    fmt.Printf("setting ticket on %d for %s\n", day, c.plate)
-    c.ticketDays[day] = true
+  start := uint32(float64(one) / 86400)
+  stop := uint32(float64(two) / 86400)
+  for i := start; i <= stop; i+=1  {
+    fmt.Printf("setting ticket on %d for %s\n", i, c.plate)
+    c.ticketDays[i] = true
   }
 }
 
@@ -366,6 +368,10 @@ func (c *SpeedClient) receiver() {
 		if err != nil { break }
 	}
 	if err != nil {
+    if err != io.EOF {
+      m := ErrorMessage{err.Error()}
+      c.q <- m
+    }
 		fmt.Printf("Client %d error %s\n", c.clientId, err)
 	} else {
 		fmt.Printf("Client %d closing\n", c.clientId)
@@ -394,6 +400,9 @@ func (c *SpeedClient) hdlWantHeartbeat() error {
 }
 
 func (c *SpeedClient) hdlIAmCamera() error {
+  if c.ctype != 0 {
+    return fmt.Errorf("wrong state")
+  }
 	c.ctype = 1
 	var err error
 	c.camRoad, err = readU16(c.con)
@@ -407,6 +416,9 @@ func (c *SpeedClient) hdlIAmCamera() error {
 }
 
 func (c *SpeedClient) hdlIAmDispatch() error {
+  if c.ctype != 0 {
+    return fmt.Errorf("wrong state")
+  }
   c.ctype = 2
   numRoads, err := readU8(c.con)
   if err != nil { return err }

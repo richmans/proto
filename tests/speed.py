@@ -16,6 +16,11 @@ def heartbeat(s):
   dur = time() - start
   print(f"heartbeat {dur:.2f}")
 
+  
+def doublecam(s):
+  s.sendall(pack(">BHHH", 0x80,1,0,80))
+  s.sendall(pack(">BHHH", 0x80,1,0,80))
+  print("Dc", s.recv(1024))
 def camera(s):
   s.sendall(pack(">BHHH", 0x80,1,0,80))
   s.sendall(b"\x20\x05snack" +pack(">I", 100000))
@@ -36,6 +41,7 @@ def readTicket(d):
 
 
 heartbeat(sock())
+doublecam(sock())
 camera(sock())
 camera2(sock())
 sleep(1)
