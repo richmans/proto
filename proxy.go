@@ -63,7 +63,7 @@ func (s *ProxyServer) stream(input net.Conn, output net.Conn) {
 func (s *ProxyServer) transform(input string) string {
 	fmt.Printf(">> %s", input)
 	tony := "${1}7YWHMfk9JZe0LM0g1ZauHuiSxhI${3}"
-	r := regexp.MustCompile(`(^|\s)(7[a-zA-Z0-9]{25,34})($|\s)`)
+	r := regexp.MustCompile(`(^|\s{0,1})7(\w{25,34})($|\s)`)
 	output := r.ReplaceAllString(input, tony)
 	fmt.Printf("<< %s", output)
 	return output
