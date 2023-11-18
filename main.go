@@ -12,7 +12,7 @@ type Server interface {
 	
 func main() {
 	var challenge int
-	flag.IntVar(&challenge, "challenge",7, "Challenge number")
+	flag.IntVar(&challenge, "challenge",8, "Challenge number")
 	flag.Parse()
 	
 	var port uint16 
@@ -35,6 +35,8 @@ func main() {
 	  	server = NewSpeedServer(port);
     case 7:
 	  	server = NewReverseServer(port);
+    case 8:
+	  	server = NewSecureServer(port);
 		default:
 			fmt.Printf("Unknown challenge\n")
 			os.Exit(1)
