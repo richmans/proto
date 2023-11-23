@@ -29,9 +29,12 @@ def put(s, q="queue1", pri=123):
     return r["id"]
   return None
 
-def get(s, q=["queue1"]):
-  j = {"request":"get","queues":["queue1"]}
+def get(s, q=["queue1"], wait=False):
+  j = {"request":"get","queues":["queue1"], "wait": wait}
   snd(s, j)
+  if wait:
+    print("Waiting...")
+    return None
   r = rsp(s)
   if "id" in r:
     return r["id"]
@@ -65,7 +68,6 @@ def test(s, s2):
   bull3(s)
   put(s) 
   jid = get(s)
-  print(jid)
   get(s)
   abort(s, jid)
   get(s)
@@ -77,6 +79,19 @@ def test(s, s2):
   s.close()
   sleep(1)
   get(s2)
+  delete(s2, jid)
 
-
-test(sock(),sock())
+def testw(s1, s2):
+  get(s1, wait=True)
+  put(s2)
+  rsp(s1)
+  
+def testw2(s1, s2):
+  put(s2)
+  get(s2)
+  get(s1, wait=True)
+  sleep(1)
+  s2.close()
+  rsp(s1)
+  
+testw2(sock(),sock())
