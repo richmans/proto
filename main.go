@@ -12,7 +12,7 @@ type Server interface {
 	
 func main() {
 	var challenge int
-	flag.IntVar(&challenge, "challenge",9, "Challenge number")
+	flag.IntVar(&challenge, "challenge",10, "Challenge number")
 	flag.Parse()
 	
 	var port uint16 
@@ -39,6 +39,8 @@ func main() {
 	  	server = NewSecureServer(port);
     case 9:
       server = NewJobServer(port);
+    case 10:
+      server = NewVcsServer(port);
 		default:
 			fmt.Printf("Unknown challenge\n")
 			os.Exit(1)
