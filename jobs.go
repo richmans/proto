@@ -289,7 +289,7 @@ func (s *JobServer) central(){
 	for m := range s.q {
     ses, ok := s.clients[m.From]
     if ! ok { continue }
-		//fmt.Printf("I %+v\n", m)
+		fmt.Printf("I %+v\n", m)
     switch m.Request {
       case "put": s.hdlPut(m, ses)
       case "get": s.hdlGet(m, ses)
@@ -352,23 +352,7 @@ func (s *JobSession) close() {
   s.con.Close()
 }
 
-func ValidatePut(r JobRequest) error {
-  if r.Job == nil {
-    return fmt.Errorf("missing job field")
-  }
-  if r.Queue == "" {
-    return fmt.Errorf("missing queue field")
-  }
-  return nil
-}
 
-func ValidateRequest(r JobRequest) error {
-  switch r.Request {
-    case "put": return ValidatePut(r)
-    
-  }
-  return nil
-}
 func ParseRequest(msg string) (JobRequest, error) {
   var r JobRequest
   err := json.Unmarshal([]byte(msg), &r)
@@ -390,11 +374,7 @@ func (s *JobSession) jobReceiver() {
 	msg, err := r.ReadString('\n')
   
 	for err == nil {
-    fmt.Printf("%s", msg)
 	  rq, perr := ParseRequest(msg)
-    if perr == nil {
-      perr = ValidateRequest(rq)
-    }
     if perr == nil {
       rq.From = s.sessionId
   	  s.backend <- rq
@@ -407,6 +387,7 @@ func (s *JobSession) jobReceiver() {
 
 func (s *JobSession) jobSender() {
 	for m := range s.q {
+    fmt.Printf("O %s", m)
 		s.con.Write(m)
 	}
 }
