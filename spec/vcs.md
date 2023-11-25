@@ -61,14 +61,19 @@ This is a tcp protocol that strictly prescribes who talks when. it has two modes
 * after a newline, if the command is put and it is a valid command, the server goes into data mode. after the specified amount of bytes has been read, the server prints a response (see below) and returns to command mode
 * for all other commands, the server prints a response and returns to command mode
 * responses start with OK or ERR and can be multiple lines
+* if a non existing command is given, the response is 'ERR illegal method: [cmd]'
 
 The filesystem must be global, shared by all users
 
+Filenames are case sensitive
+
+A node is listed as a file if it has 1 or more revisions. otherwise, it is listed as a dir. it can be both at the same time
 # commands
 commands and arguments are separated by spaces.
 
 ## help
 OK response describing all commands. 
+'OK usage: HELP|GET|PUT|LIST'
 
 if arguments are given they are ignored
 
