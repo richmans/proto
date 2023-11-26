@@ -8,11 +8,40 @@ import (
 "strings"
 "strconv"
 "io"
+"sort"
+"regexp"
 )
 
 type VcsNode struct {
   children map[string]*VcsNode
   revisions []string
+}
+
+func (n *VcsNode) getRevision(rev string) (string, error) {
+  var err error
+  
+  r := len(n.revisions)
+  if rev != "" {
+    if rev[0] == 'r' { rev = rev[1:]}
+    r, err = strconv.Atoi(rev)
+    if err != nil { return "", fmt.Errorf("no such revision")}
+  }
+  if r <1 || r > len(n.revisions) {
+    return "", fmt.Errorf("no such revision")
+  }
+  return n.revisions[r-1], nil
+}
+
+func (n *VcsNode) list() []string {
+  keys := make([]string, len(n.children))
+
+  i := 0
+  for k := range n.children {
+    keys[i] = k
+    i++
+  }
+  sort.Strings(keys)
+  return keys
 }
 
 type PutRequest struct {
@@ -86,21 +115,30 @@ func (n *VcsNode) get(path []string, create bool) (*VcsNode, error) {
   return nx.get(path[1:], create)
 }
 
+func isPrintable(p string) bool {
+  for _, c:= range []rune(p) {
+    if c > 126 {
+      return false
+    }
+  }
+  return true
+}
 func parsePath(strPath string, isDir bool) ([]string, error) {
   p := strings.Split(strPath, "/")
-  fmt.Println(p)
   itype := "file"
+  match, _ := regexp.MatchString(`[^a-zA-Z0-9.\-_/]`, strPath)
   if isDir {
     itype = "dir"
   }
-  if p[0] != "" {
+  printable := isPrintable(strPath)
+  if p[0] != "" || match || !printable {
     return []string{}, fmt.Errorf("invalid %s name", itype)
   }
   if p[len(p)-1] == "" {
     if !isDir {
       return []string{}, fmt.Errorf("invalid file name")
       }else{
-        p = p[:len(p)-2]
+        p = p[:len(p)-1]
       }
   }
   p = p[1:]
@@ -116,7 +154,9 @@ func (s *VcsStorage) hdlPut(m *PutRequest) (uint, error) {
   if err != nil {
     return 0, err
   }
-  f.revisions = append(f.revisions, m.content)
+  if len(f.revisions) < 1 || f.revisions[len(f.revisions)-1] != m.content {
+     f.revisions = append(f.revisions, m.content)
+  }
   return uint(len(f.revisions)), nil
   
 }
@@ -164,13 +204,18 @@ func (s *VcsSession) hdlHelp() error {
 
 
 func (s *VcsSession) hdlPut(args []string, r *bufio.Reader) error {
+  if len(args) != 2 { return fmt.Errorf("usage: PUT file length newline data")}
   file := args[0]
   clen, err := strconv.Atoi(args[1])
   if err != nil { clen = 0 }
   buf := make([]byte, clen)
   _, err = io.ReadFull(r, buf)
   if err!= nil { return err }
-  rq := NewPutRequest(file, string(buf))
+  content := string(buf)
+  if ! isPrintable(content) {
+    return fmt.Errorf("text files only")
+  }
+  rq := NewPutRequest(file, content)
   s.storage.q <- rq
   result := <- rq.callback 
   err = result.err
@@ -180,21 +225,71 @@ func (s *VcsSession) hdlPut(args []string, r *bufio.Reader) error {
   return err
 }
 
+func (s *VcsSession) hdlList(args []string) error {
+  if len(args) != 1 { return fmt.Errorf("usage: LIST dir")}
+  dir := args[0]
+  path, err := parsePath(dir, true )
+  if err != nil {
+    return err
+  }
+  n, err := s.storage.root.get(path, false)
+  if err != nil {
+    s.write("OK 0\n")
+    return nil
+  }
+  s.write(fmt.Sprintf("OK %d\n", len(n.children)))
+  for _, nm := range n.list() {
+    child := n.children[nm]
+    meta := "DIR"
+    if len(child.revisions) > 0{
+      meta = fmt.Sprintf("r%d", len(child.revisions))
+    }else{
+      nm += "/"
+    }
+    s.write(fmt.Sprintf("%s %s\n", nm, meta))
+  }
+  return nil
+}
+
+func (s *VcsSession) hdlGet(args []string) error {
+  if len(args) < 1 || len(args) > 2{ return fmt.Errorf("usage: GET file [revision]")}
+  file := args[0]
+  rev := ""
+  if len(args) > 1 {
+    rev = args[1]
+  }
+  path, err := parsePath(file, false )
+  if err != nil {
+    return err
+  }
+  n, err := s.storage.root.get(path, false) 
+  if err != nil { return err }
+  data, err := n.getRevision(rev)
+  if err != nil { return err}
+  s.write(fmt.Sprintf("OK %d\n", len(data)))
+  s.write(data)
+  return nil
+}
+
+
 func (s *VcsSession) process(cmd string, r *bufio.Reader) error {
-  fmt.Println(cmd)
   var err error
   parts := strings.Split(cmd, " ")
   if len(parts) == 0 { return fmt.Errorf("illegal method:")}
   method := strings.ToLower(parts[0])
+  args := parts[1:]
   switch method {
     case "help": err = s.hdlHelp()
-    case "put": err = s.hdlPut(parts[1:], r)
+    case "put": err = s.hdlPut(args, r)
+    case "list": err = s.hdlList(args)
+    case "get": err = s.hdlGet(args)
     default: err = fmt.Errorf("illegal method: %s", method)
   }
   return err
 }
 
 func (s *VcsSession) write(m string){
+  fmt.Printf("O %s", m)
   s.con.Write([]byte(m))
 }
 
@@ -202,6 +297,7 @@ func (s *VcsSession) commandMode(r *bufio.Reader) error {
   s.write("READY\n")
   msg, err := r.ReadString('\n')
   if err != nil { return err }
+  fmt.Printf("I %q\n",msg)
   msg = strings.TrimSpace(msg)
   perr := s.process(msg, r)
   if perr != nil {
