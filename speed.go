@@ -12,34 +12,6 @@ import (
 "bytes"
 )
 
-var BE = binary.BigEndian
-
-func readU8(r io.Reader) (uint8, error) {
-	var result uint8
-	err := binary.Read(r, BE, &result);
-	return result, err
-}
-
-func readU16(r io.Reader) (uint16, error) {
-	var result uint16
-	err := binary.Read(r, BE, &result);
-	return result, err
-}
-func readU32(r io.Reader) (uint32, error) {
-	var result uint32
-	err := binary.Read(r, BE, &result);
-	return result, err
-}
-func readString(r io.Reader) (string, error) {
-	l, err := readU8(r)
-	if err == nil && l == 0 {
-		err = fmt.Errorf("invalid string length 0")
-	}
-	if err != nil { return "", err}
-	buf := make([]byte, l)
-	_, err = io.ReadFull(r, buf)
-	return string(buf), err
-}
 type SpeedMessage interface {
 	serialize() []byte
 }
