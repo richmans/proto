@@ -6,6 +6,7 @@ import (
 "fmt"
 "bufio"
 "bytes"
+"time"
 )
 
 const PACKET_HELLO = 0x50
@@ -45,12 +46,13 @@ func (r *PacketReader) Read(b []byte) (int, error) {
   if ! r.started {
     return 0, fmt.Errorf("read called but not started")
   }
+  fmt.Printf("rd %d cnt %d left %d\n", len(b), r.count, bytesLeft)
   n, err := r.base.Read(b)
   if err != nil { return 0, err }
   for i := 0; i < n; i++ {
     r.sum += b[i]
   }
-  r.count += uint(len(b))
+  r.count += uint(n)
   return n, err
 }
 
@@ -372,6 +374,7 @@ func readDeletePolicyOkPacket(r *PacketReader) error {
 }
 
 func writeError(w *PacketWriter, e error) error {
+  fmt.Printf("sending error: %s\n", e)
   err := w.start(PACKET_ERROR)
   if err != nil { return err }
   err = writeLString(w, e.Error())
@@ -570,13 +573,18 @@ func (s *PestServer) processClient(con net.Conn) {
 
 func (s *PestSession) pestHandler() error {
 	err := readHello(s.r)
-  if err != nil { return err }
   fmt.Println("got hello, sending back")
-  err = sendHello(s.w)
+  sendHello(s.w)
+  if err != nil { 
+    writeError(s.w, err)
+    return err
+  }
+  
   var v SiteVisitPacket
   for err == nil {
+  s.con.SetReadDeadline(time.Now().Add(30*time.Second))
     v, err = readSiteVisitPacket(s.r)
-    if err != nil { return err }
+    if err != nil { break }
     fmt.Printf("I %+v\n", v)
     err := validateSiteVisit(v)
     if err != nil {
@@ -585,6 +593,8 @@ func (s *PestSession) pestHandler() error {
       s.backend <- v
     }
   }
+  writeError(s.w, err)
+  fmt.Printf("ERROR: %s\n", err)
   return err
 }
 
